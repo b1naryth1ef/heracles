@@ -8,5 +8,8 @@
   - tokens can be limited to a subset of realms (maybe?)
 - Add audit log
 - Add HTML UI
+  - make it pretty :)
 - Add CLI tool
 - Support JSON/PostForm for data
+- AD/LDAP Provider?
+- MFA (2FA, Fido)

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"html/template"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -19,7 +20,7 @@ func getCurrentUser(r *http.Request) *User {
 	return r.Context().Value("authuser").(*User)
 }
 
-func getRequestUserViaCookie(r *http.Request) (*User, error) {
+func findRequestUserViaCookie(r *http.Request) (*User, error) {
 	authCookie, err := r.Cookie("heracles-auth")
 	if err != nil {
 		return nil, err
@@ -33,7 +34,7 @@ func getRequestUserViaCookie(r *http.Request) (*User, error) {
 	return GetUserByAuthSecret(decodedAuthSecret)
 }
 
-func getRequestUserViaBasicAuth(r *http.Request) (*User, error) {
+func findRequestUserViaBasicAuth(r *http.Request) (*User, error) {
 	username, password, ok := r.BasicAuth()
 	if !ok {
 		return nil, ErrNoUser
@@ -44,20 +45,49 @@ func getRequestUserViaBasicAuth(r *http.Request) (*User, error) {
 		return nil, err
 	}
 
-	if user.CheckPassword(password) != nil {
+	// Check token first because its actually cheaper than a bcrypt check
+	tokenUser, err := GetUserByToken(password)
+	if err == nil && tokenUser.Id == user.Id {
+		return user, nil
+	} else if user.CheckPassword(password) == nil {
+		return user, nil
+	}
+
+	return nil, ErrNoUser
+}
+
+func findRequestUserViaAuthHeader(r *http.Request) (*User, error) {
+	token := r.Header.Get("Authorization")
+	if token == "" {
 		return nil, ErrNoUser
 	}
 
-	return user, nil
-}
-
-func getRequestUser(r *http.Request) (*User, error) {
-	user, err := getRequestUserViaCookie(r)
+	user, err := GetUserByToken(token)
 	if err == nil {
 		return user, nil
 	}
 
-	user, err = getRequestUserViaBasicAuth(r)
+	decodedAuthSecret, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: eventually this should be tokens
+	return GetUserByAuthSecret(decodedAuthSecret)
+}
+
+func findRequestUser(r *http.Request) (*User, error) {
+	user, err := findRequestUserViaCookie(r)
+	if err == nil {
+		return user, nil
+	}
+
+	user, err = findRequestUserViaBasicAuth(r)
+	if err == nil {
+		return user, nil
+	}
+
+	user, err = findRequestUserViaAuthHeader(r)
 	if err == nil {
 		return user, nil
 	}
@@ -67,7 +97,7 @@ func getRequestUser(r *http.Request) (*User, error) {
 
 func RequireAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, err := getRequestUser(r)
+		user, err := findRequestUser(r)
 		if err != nil {
 			gores.Error(w, http.StatusUnauthorized, "Unauthorized")
 			return
@@ -77,14 +107,26 @@ func RequireAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func GetLogin(w http.ResponseWriter, r *http.Request) {
+func RequireAdminMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := getCurrentUser(r)
+		if !user.IsAdmin() {
+			gores.Error(w, http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func GetLoginRoute(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	t := template.Must(template.New("login.html").ParseFiles("login.html"))
 	t.Execute(w, r.Form.Get("r"))
 	// http.ServeFile(w, r, "login.html")
 }
 
-func PostLogin(w http.ResponseWriter, r *http.Request) {
+func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		gores.Error(w, http.StatusBadRequest, "Bad Form Data")
@@ -108,43 +150,71 @@ func PostLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authSecret := user.GetAuthSecret()
-	authSecretEncoded := base64.RawURLEncoding.EncodeToString(authSecret)
-
-	realmURL, err := url.Parse("https://" + r.Form.Get("r"))
-	if err != nil {
-		gores.Error(w, http.StatusBadRequest, "Bad realm")
+	// Lookup redirect URL
+	redirectURLRaw := r.Form.Get("r")
+	if redirectURLRaw == "" {
+		gores.Error(w, http.StatusBadRequest, "Missing Redirect URL")
 		return
 	}
+
+	redirectURL, err := url.Parse(redirectURLRaw)
+	if err != nil {
+		gores.Error(w, http.StatusBadRequest, "Bad Redirect URL")
+		return
+	}
+
+	// Create our authentication cookie
+	authSecret := user.GetAuthSecret()
+	authSecretEncoded := base64.RawURLEncoding.EncodeToString(authSecret)
 
 	cookie := http.Cookie{
 		Name:   "heracles-auth",
 		Domain: viper.GetString("cookie_domain"),
 		Value:  authSecretEncoded,
 		Path:   "",
+		MaxAge: 60 * 60 * 24 * 14,
 	}
-
 	http.SetCookie(w, &cookie)
-	// TODO: set max age
 
-	http.Redirect(w, r, realmURL.String(), http.StatusFound)
+	http.Redirect(w, r, redirectURL.String(), http.StatusFound)
 }
 
-func GetLogout(w http.ResponseWriter, r *http.Request) {
+func GetLogoutRoute(w http.ResponseWriter, r *http.Request) {
 	cookie := http.Cookie{
 		Name:   "heracles-auth",
 		Domain: viper.GetString("cookie_domain"),
+		Value:  "",
+		Path:   "",
 		MaxAge: -1,
 	}
 
 	http.SetCookie(w, &cookie)
-	gores.NoContent(w)
+
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func GetIdentity(w http.ResponseWriter, r *http.Request) {
+func GetIdentityRoute(w http.ResponseWriter, r *http.Request) {
 	user := getCurrentUser(r)
 
-	gores.JSON(w, http.StatusOK, map[string]interface{}{
-		"username": user.Username,
-	})
+	gores.JSON(w, http.StatusOK, user)
+}
+
+func ValidateRoute(w http.ResponseWriter, r *http.Request) {
+	user := getCurrentUser(r)
+
+	realm := r.Header.Get("X-Heracles-Realm")
+	realmGrant, err := GetUserRealmGrantByRealmName(user.Id, realm)
+	if err != nil {
+		log.Printf("[Validate] failed to find realm grant for user %v and realm %v: %v", user.Username, realm, err)
+		gores.Error(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	if realmGrant.Alias != nil {
+		w.Header().Set("X-Heracles-User", *realmGrant.Alias)
+	} else {
+		w.Header().Set("X-Heracles-User", user.Username)
+	}
+
+	gores.NoContent(w)
 }

@@ -1,7 +1,9 @@
 package heracles
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"log"
 	"strconv"
 
@@ -51,10 +53,9 @@ CREATE TABLE IF NOT EXISTS user_realm_grants (
 
 type Bits uint64
 
-func (b Bits) Set(flag Bits) Bits    { return b | flag }
-func (b Bits) Clear(flag Bits) Bits  { return b &^ flag }
-func (b Bits) Toggle(flag Bits) Bits { return b ^ flag }
-func (b Bits) Has(flag Bits) bool    { return b&flag != 0 }
+func (b Bits) Set(flag Bits) Bits   { return b | flag }
+func (b Bits) Clear(flag Bits) Bits { return b &^ flag }
+func (b Bits) Has(flag Bits) bool   { return b&flag != 0 }
 
 const (
 	USER_FLAG_ADMIN = 1 << iota
@@ -73,6 +74,10 @@ func (u *User) CheckPassword(password string) error {
 
 func (u *User) GetAuthSecret() []byte {
 	return signer.Sign([]byte(strconv.Itoa(int(u.Id))))
+}
+
+func (u *User) IsAdmin() bool {
+	return u.Flags.Has(USER_FLAG_ADMIN)
 }
 
 func CreateUser(username, password string, flags Bits) (*User, error) {
@@ -134,7 +139,7 @@ func GetUserByToken(token string) (*User, error) {
 
 	err := db.Get(&user, `
 		SELECT u.* FROM users u
-		JOIN user_token ut ON u.id = ut.user_id
+		JOIN user_tokens ut ON u.id = ut.user_id
 		WHERE ut.token = ?
 	`, token)
 	if err != nil {
@@ -155,11 +160,55 @@ func GetUserByUsername(username string) (*User, error) {
 	return &user, nil
 }
 
+func GetUsers() ([]User, error) {
+	var users []User
+	err := db.Select(&users, `SELECT * FROM users`)
+	return users, err
+}
+
 type UserToken struct {
 	Id     int64  `json:"id" db:"id"`
-	UserId int64  `json:"user_id" db:"user_id"`
+	UserId int64  `json:"-" db:"user_id"`
 	Name   string `json:"name" db:"name"`
 	Token  string `json:"token" db:"token"`
+}
+
+func CreateUserToken(userId int64, name string) (*UserToken, error) {
+	tokenRaw := make([]byte, 128)
+	_, err := rand.Read(tokenRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenEncoded := base64.RawURLEncoding.EncodeToString(tokenRaw)
+
+	result, err := db.Exec(
+		`INSERT INTO user_tokens (user_id, name, token) VALUES (?, ?, ?);`,
+		userId,
+		name,
+		tokenEncoded,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserToken{
+		Id:     id,
+		UserId: userId,
+		Name:   name,
+		Token:  tokenEncoded,
+	}, nil
+}
+
+func GetUserTokensByUserId(id int64) ([]UserToken, error) {
+	var userTokens []UserToken
+	err := db.Select(&userTokens, `SELECT * FROM user_tokens WHERE user_id=?`, id)
+	return userTokens, err
 }
 
 type Realm struct {
@@ -167,10 +216,74 @@ type Realm struct {
 	Name string `json:"name" db:"name"`
 }
 
+func CreateRealm(name string) (*Realm, error) {
+	result, err := db.Exec(`INSERT INTO realms (name) VALUES (?);`, name)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Realm{
+		Id:   id,
+		Name: name,
+	}, nil
+}
+
+func GetRealmById(id int64) (*Realm, error) {
+	var realm Realm
+	err := db.Get(&realm, `SELECT * FROM realms WHERE id=?`, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &realm, nil
+}
+
+func GetRealms() ([]Realm, error) {
+	var realms []Realm
+	err := db.Select(&realms, `SELECT * FROM realms`)
+	return realms, err
+}
+
 type UserRealmGrant struct {
-	UserId  int64  `json:"user_id" db:"user_id"`
-	RealmId int64  `json:"realm_id" db:"realm_id"`
-	Alias   string `json:"alias" db:"alias"`
+	UserId  int64   `json:"user_id" db:"user_id"`
+	RealmId int64   `json:"realm_id" db:"realm_id"`
+	Alias   *string `json:"alias" db:"alias"`
+}
+
+func CreateUserRealmGrant(userId int64, realmId int64, alias *string) (*UserRealmGrant, error) {
+	_, err := db.Exec(`
+		INSERT INTO user_realm_grants (user_id, realm_id, alias)
+		VALUES (?, ?, ?);
+	`, userId, realmId, alias)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserRealmGrant{
+		UserId:  userId,
+		RealmId: realmId,
+		Alias:   alias,
+	}, nil
+}
+
+func GetUserRealmGrantByRealmName(userId int64, realmName string) (*UserRealmGrant, error) {
+	var grant UserRealmGrant
+
+	err := db.Get(&grant, `
+		SELECT urg.* FROM user_realm_grants urg
+		JOIN realms r ON r.id = urg.realm_id
+		WHERE r.name = ? AND urg.user_id = ?
+	`, realmName, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &grant, nil
 }
 
 func initDB(path, secretKey string) {
@@ -193,7 +306,8 @@ func bootstrapDB() {
 	log.Printf("Bootstraping Database w/ admin user")
 
 	var flags Bits
-	flags.Set(USER_FLAG_ADMIN)
+	flags = flags.Set(USER_FLAG_ADMIN)
+
 	_, err := CreateUser("admin", "admin", flags)
 	if err != nil {
 		panic(err)

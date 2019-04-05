@@ -6,7 +6,7 @@ import (
 	"github.com/alioygur/gores"
 )
 
-func PostUsers(w http.ResponseWriter, r *http.Request) {
+func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		gores.Error(w, http.StatusBadRequest, "Bad Form Data")
@@ -24,7 +24,7 @@ func PostUsers(w http.ResponseWriter, r *http.Request) {
 
 	var flags Bits
 	if admin == "1" {
-		flags.Set(USER_FLAG_ADMIN)
+		flags = flags.Set(USER_FLAG_ADMIN)
 	}
 
 	user, err := CreateUser(username, password, flags)
@@ -34,4 +34,16 @@ func PostUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gores.JSON(w, http.StatusOK, user)
+}
+
+func GetUsersRoute(w http.ResponseWriter, r *http.Request) {
+	users, err := GetUsers()
+	if err != nil {
+		reportInternalError(w, err)
+		return
+	}
+
+	gores.JSON(w, http.StatusOK, map[string]interface{}{
+		"users": users,
+	})
 }
