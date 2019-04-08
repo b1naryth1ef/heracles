@@ -24,6 +24,15 @@ func readRequestData(w http.ResponseWriter, r *http.Request, target interface{})
 		}
 
 		return true
+	} else if contentType == "application/x-www-form-urlencoded" {
+		err := r.ParseForm()
+		if err != nil {
+			gores.Error(w, http.StatusBadRequest, fmt.Sprintf("Invalid Request Form: %v", err))
+			return false
+		}
+
+		// TODO
+		return false
 	}
 
 	gores.Error(w, http.StatusBadRequest, fmt.Sprintf("Unsupported Content-Type: %v", contentType))
@@ -36,36 +45,49 @@ func reportInternalError(w http.ResponseWriter, err error) {
 
 func NewRouter() http.Handler {
 	router := chi.NewRouter()
-
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.Timeout(timeout))
 	router.Use(middleware.Logger)
 
+	authRouter := router.With(RequireAuthMiddleware)
+
+	// Static/User-Friendly Routes
 	router.Get("/login", GetLoginRoute)
 	router.Post("/login", PostLoginRoute)
 	router.Get("/logout", GetLogoutRoute)
+	authRouter.Get("/", GetIndexRoute)
 
-	authRouter := router.With(RequireAuthMiddleware)
-	authRouter.Get("/identity", GetIdentityRoute)
+	authRouter.Route("/api", func(apiRouter chi.Router) {
+		// Validate route used for linking up nginx auth_request
+		apiRouter.Handle("/validate", http.HandlerFunc(ValidateRoute))
 
-	authRouter.Handle("/validate", http.HandlerFunc(ValidateRoute))
+		// Returns information about the current users identity
+		apiRouter.Get("/identity", GetIdentityRoute)
 
-	authRouter.Route("/tokens", func(r chi.Router) {
-		r.Get("/", GetTokensRoute)
-		r.Post("/", PostTokensRoute)
-	})
+		// Tokens can be managed by users and give third party services / clients
+		//  access on behalf of a registered user.
+		apiRouter.Route("/tokens", func(r chi.Router) {
+			r.Get("/", GetTokensRoute)
+			r.Post("/", PostTokensRoute)
 
-	adminRouter := authRouter.With(RequireAdminMiddleware)
+			r.With(RequireUserTokenMiddleware).Route("/{tokenId}", func(r chi.Router) {
+				r.Delete("/", DeleteTokenRoute)
+				r.Patch("/", PatchTokenRoute)
+			})
+		})
 
-	adminRouter.Route("/users", func(r chi.Router) {
-		r.Get("/", GetUsersRoute)
-		r.Post("/", PostUsersRoute)
-	})
+		adminRouter := apiRouter.With(RequireAdminMiddleware)
 
-	adminRouter.Route("/realms", func(r chi.Router) {
-		r.Get("/", GetRealmsRoute)
-		r.Post("/", PostRealmsRoute)
-		r.Post("/grants", PostRealmsGrantsRoute)
+		adminRouter.Route("/users", func(r chi.Router) {
+			r.Get("/", GetUsersRoute)
+			r.Post("/", PostUsersRoute)
+		})
+
+		adminRouter.Route("/realms", func(r chi.Router) {
+			r.Get("/", GetRealmsRoute)
+			r.Post("/", PostRealmsRoute)
+			r.Post("/grants", PostRealmsGrantsRoute)
+		})
 	})
 
 	// router.With(RequireUserMiddleware).Route("/users/{user_id}", func(r chi.Router) {

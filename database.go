@@ -173,14 +173,36 @@ type UserToken struct {
 	Token  string `json:"token" db:"token"`
 }
 
-func CreateUserToken(userId int64, name string) (*UserToken, error) {
+func (ut *UserToken) Delete() error {
+	_, err := db.Exec(`DELETE FROM user_tokens WHERE id=?`, ut.Id)
+	return err
+}
+
+func (ut *UserToken) Save() error {
+	_, err := db.Exec(
+		`UPDATE user_tokens SET name=? AND token=? WHERE id=?`,
+		ut.Name,
+		ut.Token,
+		ut.Id,
+	)
+	return err
+}
+
+func GenerateUserTokenContents() (string, error) {
 	tokenRaw := make([]byte, 128)
 	_, err := rand.Read(tokenRaw)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	tokenEncoded := base64.RawURLEncoding.EncodeToString(tokenRaw)
+	return base64.RawURLEncoding.EncodeToString(tokenRaw), nil
+}
+
+func CreateUserToken(userId int64, name string) (*UserToken, error) {
+	tokenEncoded, err := GenerateUserTokenContents()
+	if err != nil {
+		return nil, err
+	}
 
 	result, err := db.Exec(
 		`INSERT INTO user_tokens (user_id, name, token) VALUES (?, ?, ?);`,
@@ -203,6 +225,15 @@ func CreateUserToken(userId int64, name string) (*UserToken, error) {
 		Name:   name,
 		Token:  tokenEncoded,
 	}, nil
+}
+
+func GetUserTokenById(id int64) (*UserToken, error) {
+	var userToken UserToken
+	err := db.Get(&userToken, `SELECT * FROM user_tokens WHERE id=?`, id)
+	if err != nil {
+		return nil, err
+	}
+	return &userToken, nil
 }
 
 func GetUserTokensByUserId(id int64) ([]UserToken, error) {

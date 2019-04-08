@@ -1,11 +1,41 @@
 package heracles
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/alioygur/gores"
+	"github.com/go-chi/chi"
 )
+
+func getCurrentUserToken(r *http.Request) *UserToken {
+	return r.Context().Value("userToken").(*UserToken)
+}
+
+func RequireUserTokenMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenIdRaw := chi.URLParam(r, "tokenId")
+
+		tokenId, err := strconv.Atoi(tokenIdRaw)
+		if err != nil {
+			gores.Error(w, http.StatusBadRequest, "Invalid token ID")
+			return
+		}
+
+		userToken, err := GetUserTokenById(int64(tokenId))
+		if err == sql.ErrNoRows {
+			gores.Error(w, http.StatusNotFound, "Not Found")
+			return
+		} else if err != nil {
+			reportInternalError(w, err)
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), "userToken", userToken)))
+	})
+}
 
 func GetTokensRoute(w http.ResponseWriter, r *http.Request) {
 	user := getCurrentUser(r)
@@ -58,4 +88,50 @@ func PostTokensRoute(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gores.JSON(w, http.StatusOK, token)
+}
+
+func DeleteTokenRoute(w http.ResponseWriter, r *http.Request) {
+	userToken := getCurrentUserToken(r)
+	err := userToken.Delete()
+	if err != nil {
+		reportInternalError(w, err)
+		return
+	}
+
+	gores.NoContent(w)
+}
+
+type PatchTokenPayload struct {
+	Name       *string `json:"name"`
+	ResetToken bool    `json:"reset_token"`
+}
+
+func PatchTokenRoute(w http.ResponseWriter, r *http.Request) {
+	var payload PatchTokenPayload
+	if !readRequestData(w, r, &payload) {
+		return
+	}
+
+	userToken := getCurrentUserToken(r)
+	if payload.ResetToken {
+		newToken, err := GenerateUserTokenContents()
+		if err != nil {
+			reportInternalError(w, err)
+			return
+		}
+
+		userToken.Token = newToken
+	}
+
+	if payload.Name != nil {
+		userToken.Name = *payload.Name
+	}
+
+	err := userToken.Save()
+	if err != nil {
+		reportInternalError(w, err)
+		return
+	}
+
+	gores.JSON(w, http.StatusOK, userToken)
 }

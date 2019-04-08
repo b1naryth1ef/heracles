@@ -121,9 +121,13 @@ func RequireAdminMiddleware(next http.Handler) http.Handler {
 
 func GetLoginRoute(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
-	t := template.Must(template.New("login.html").ParseFiles("login.html"))
+	t := template.Must(template.New("login.html").ParseFiles("static/login.html"))
 	t.Execute(w, r.Form.Get("r"))
-	// http.ServeFile(w, r, "login.html")
+}
+
+func GetIndexRoute(w http.ResponseWriter, r *http.Request) {
+	t := template.Must(template.New("index.html").ParseFiles("static/index.html"))
+	t.Execute(w, getCurrentUser(r))
 }
 
 func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
@@ -203,6 +207,12 @@ func ValidateRoute(w http.ResponseWriter, r *http.Request) {
 	user := getCurrentUser(r)
 
 	realm := r.Header.Get("X-Heracles-Realm")
+	if realm == "" {
+		log.Printf("[Validate] invalid realm provided: %v", realm)
+		gores.Error(w, http.StatusBadRequest, "Invalid Realm")
+		return
+	}
+
 	realmGrant, err := GetUserRealmGrantByRealmName(user.Id, realm)
 	if err != nil {
 		log.Printf("[Validate] failed to find realm grant for user %v and realm %v: %v", user.Username, realm, err)
