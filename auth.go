@@ -11,16 +11,17 @@ import (
 	"net/url"
 
 	"github.com/alioygur/gores"
+	"github.com/b1naryth1ef/heracles/db"
 	"github.com/spf13/viper"
 )
 
 var ErrNoUser = errors.New("No User")
 
-func getCurrentUser(r *http.Request) *User {
-	return r.Context().Value("authuser").(*User)
+func getCurrentUser(r *http.Request) *db.User {
+	return r.Context().Value("authuser").(*db.User)
 }
 
-func findRequestUserViaCookie(r *http.Request) (*User, error) {
+func findRequestUserViaCookie(r *http.Request) (*db.User, error) {
 	authCookie, err := r.Cookie("heracles-auth")
 	if err != nil {
 		return nil, err
@@ -31,22 +32,22 @@ func findRequestUserViaCookie(r *http.Request) (*User, error) {
 		return nil, err
 	}
 
-	return GetUserByAuthSecret(decodedAuthSecret)
+	return db.GetUserByAuthSecret(decodedAuthSecret)
 }
 
-func findRequestUserViaBasicAuth(r *http.Request) (*User, error) {
+func findRequestUserViaBasicAuth(r *http.Request) (*db.User, error) {
 	username, password, ok := r.BasicAuth()
 	if !ok {
 		return nil, ErrNoUser
 	}
 
-	user, err := GetUserByUsername(username)
+	user, err := db.GetUserByUsername(username)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check token first because its actually cheaper than a bcrypt check
-	tokenUser, err := GetUserByToken(password)
+	tokenUser, err := db.GetUserByToken(password)
 	if err == nil && tokenUser.Id == user.Id {
 		return user, nil
 	} else if user.CheckPassword(password) == nil {
@@ -56,13 +57,13 @@ func findRequestUserViaBasicAuth(r *http.Request) (*User, error) {
 	return nil, ErrNoUser
 }
 
-func findRequestUserViaAuthHeader(r *http.Request) (*User, error) {
+func findRequestUserViaAuthHeader(r *http.Request) (*db.User, error) {
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		return nil, ErrNoUser
 	}
 
-	user, err := GetUserByToken(token)
+	user, err := db.GetUserByToken(token)
 	if err == nil {
 		return user, nil
 	}
@@ -73,10 +74,10 @@ func findRequestUserViaAuthHeader(r *http.Request) (*User, error) {
 	}
 
 	// TODO: eventually this should be tokens
-	return GetUserByAuthSecret(decodedAuthSecret)
+	return db.GetUserByAuthSecret(decodedAuthSecret)
 }
 
-func findRequestUser(r *http.Request) (*User, error) {
+func findRequestUser(r *http.Request) (*db.User, error) {
 	user, err := findRequestUserViaCookie(r)
 	if err == nil {
 		return user, nil
@@ -140,7 +141,7 @@ func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 	username := r.PostForm.Get("username")
 	password := r.PostForm.Get("password")
 
-	user, err := GetUserByUsername(username)
+	user, err := db.GetUserByUsername(username)
 	if err == sql.ErrNoRows {
 		gores.Error(w, http.StatusBadRequest, "Unknown user")
 		return
@@ -213,7 +214,7 @@ func ValidateRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	realmGrant, err := GetUserRealmGrantByRealmName(user.Id, realm)
+	realmGrant, err := db.GetUserRealmGrantByRealmName(user.Id, realm)
 	if err != nil {
 		log.Printf("[Validate] failed to find realm grant for user %v and realm %v: %v", user.Username, realm, err)
 		gores.Error(w, http.StatusUnauthorized, "Unauthorized")

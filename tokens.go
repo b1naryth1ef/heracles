@@ -7,11 +7,12 @@ import (
 	"strconv"
 
 	"github.com/alioygur/gores"
+	"github.com/b1naryth1ef/heracles/db"
 	"github.com/go-chi/chi"
 )
 
-func getCurrentUserToken(r *http.Request) *UserToken {
-	return r.Context().Value("userToken").(*UserToken)
+func getCurrentUserToken(r *http.Request) *db.UserToken {
+	return r.Context().Value("userToken").(*db.UserToken)
 }
 
 func RequireUserTokenMiddleware(next http.Handler) http.Handler {
@@ -24,7 +25,7 @@ func RequireUserTokenMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		userToken, err := GetUserTokenById(int64(tokenId))
+		userToken, err := db.GetUserTokenById(int64(tokenId))
 		if err == sql.ErrNoRows {
 			gores.Error(w, http.StatusNotFound, "Not Found")
 			return
@@ -40,7 +41,7 @@ func RequireUserTokenMiddleware(next http.Handler) http.Handler {
 func GetTokensRoute(w http.ResponseWriter, r *http.Request) {
 	user := getCurrentUser(r)
 
-	tokens, err := GetUserTokensByUserId(user.Id)
+	tokens, err := db.GetUserTokensByUserId(user.Id)
 	if err != nil {
 		reportInternalError(w, err)
 		return
@@ -71,7 +72,7 @@ func PostTokensRoute(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var err error
-		user, err = GetUserById(*payload.UserId)
+		user, err = db.GetUserById(*payload.UserId)
 		if err == sql.ErrNoRows {
 			gores.Error(w, http.StatusBadRequest, "Unknown User")
 			return
@@ -81,7 +82,7 @@ func PostTokensRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	token, err := CreateUserToken(user.Id, payload.Name)
+	token, err := db.CreateUserToken(user.Id, payload.Name)
 	if err != nil {
 		reportInternalError(w, err)
 		return
@@ -114,7 +115,7 @@ func PatchTokenRoute(w http.ResponseWriter, r *http.Request) {
 
 	userToken := getCurrentUserToken(r)
 	if payload.ResetToken {
-		newToken, err := GenerateUserTokenContents()
+		newToken, err := db.GenerateUserTokenContents()
 		if err != nil {
 			reportInternalError(w, err)
 			return

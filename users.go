@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/alioygur/gores"
+	"github.com/b1naryth1ef/heracles/db"
 )
 
 func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
@@ -22,12 +23,12 @@ func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var flags Bits
+	var flags db.Bits
 	if admin == "1" {
-		flags = flags.Set(USER_FLAG_ADMIN)
+		flags = flags.Set(db.USER_FLAG_ADMIN)
 	}
 
-	user, err := CreateUser(username, password, flags)
+	user, err := db.CreateUser(username, password, flags)
 	if err != nil {
 		reportInternalError(w, err)
 		return
@@ -37,7 +38,7 @@ func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetUsersRoute(w http.ResponseWriter, r *http.Request) {
-	users, err := GetUsers()
+	users, err := db.GetUsers()
 	if err != nil {
 		reportInternalError(w, err)
 		return

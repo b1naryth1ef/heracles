@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/alioygur/gores"
+	"github.com/b1naryth1ef/heracles/db"
 )
 
 type CreateRealmPayload struct {
@@ -11,7 +12,7 @@ type CreateRealmPayload struct {
 }
 
 func GetRealmsRoute(w http.ResponseWriter, r *http.Request) {
-	realms, err := GetRealms()
+	realms, err := db.GetRealms()
 	if err != nil {
 		reportInternalError(w, err)
 		return
@@ -33,7 +34,7 @@ func PostRealmsRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	realm, err := CreateRealm(payload.Name)
+	realm, err := db.CreateRealm(payload.Name)
 	if err != nil {
 		reportInternalError(w, err)
 		return
@@ -54,19 +55,19 @@ func PostRealmsGrantsRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	realm, err := GetRealmById(payload.RealmId)
+	realm, err := db.GetRealmById(payload.RealmId)
 	if err != nil {
 		reportInternalError(w, err)
 		return
 	}
 
-	user, err := GetUserById(payload.UserId)
+	user, err := db.GetUserById(payload.UserId)
 	if err != nil {
 		reportInternalError(w, err)
 		return
 	}
 
-	realmGrant, err := CreateUserRealmGrant(user.Id, realm.Id, payload.Alias)
+	realmGrant, err := db.CreateUserRealmGrant(user.Id, realm.Id, payload.Alias)
 	if err != nil {
 		reportInternalError(w, err)
 		return
