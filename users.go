@@ -7,28 +7,30 @@ import (
 	"github.com/b1naryth1ef/heracles/db"
 )
 
+type CreateUserPayload struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Admin    bool   `json:"admin"`
+}
+
 func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-	if err != nil {
-		gores.Error(w, http.StatusBadRequest, "Bad Form Data")
+	var payload CreateUserPayload
+
+	if !readRequestData(w, r, &payload) {
 		return
 	}
 
-	username := r.Form.Get("username")
-	password := r.Form.Get("password")
-	admin := r.Form.Get("admin")
-
-	if username == "" || password == "" {
+	if payload.Username == "" || payload.Password == "" {
 		gores.Error(w, http.StatusBadRequest, "username and password are required")
 		return
 	}
 
 	var flags db.Bits
-	if admin == "1" {
+	if payload.Admin {
 		flags = flags.Set(db.USER_FLAG_ADMIN)
 	}
 
-	user, err := db.CreateUser(username, password, flags)
+	user, err := db.CreateUser(payload.Username, payload.Password, flags)
 	if err != nil {
 		reportInternalError(w, err)
 		return

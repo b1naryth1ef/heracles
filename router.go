@@ -9,6 +9,7 @@ import (
 	"github.com/alioygur/gores"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/gorilla/schema"
 )
 
 const timeout = 15 * time.Second
@@ -31,8 +32,13 @@ func readRequestData(w http.ResponseWriter, r *http.Request, target interface{})
 			return false
 		}
 
-		// TODO
-		return false
+		err = schema.NewDecoder().Decode(target, r.PostForm)
+		if err != nil {
+			gores.Error(w, http.StatusBadRequest, fmt.Sprintf("Invalid Form Data: %v", err))
+			return false
+		}
+
+		return true
 	}
 
 	gores.Error(w, http.StatusBadRequest, fmt.Sprintf("Unsupported Content-Type: %v", contentType))
@@ -54,7 +60,8 @@ func NewRouter() http.Handler {
 	// Static/User-Friendly Routes
 	router.Get("/login", GetLoginRoute)
 	router.Post("/login", PostLoginRoute)
-	router.Get("/logout", GetLogoutRoute)
+	router.Handle("/logout", http.HandlerFunc(GetLogoutRoute))
+
 	authRouter.Get("/", GetIndexRoute)
 
 	authRouter.Route("/api", func(apiRouter chi.Router) {
@@ -63,6 +70,9 @@ func NewRouter() http.Handler {
 
 		// Returns information about the current users identity
 		apiRouter.Get("/identity", GetIdentityRoute)
+
+		// Updates the users identity
+		apiRouter.Patch("/identity", PatchIdentityRoute)
 
 		// Tokens can be managed by users and give third party services / clients
 		//  access on behalf of a registered user.

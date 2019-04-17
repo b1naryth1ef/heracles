@@ -7,8 +7,10 @@ import (
 	"github.com/bwmarrin/go-alone"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/spf13/viper"
 )
 
+var difficulty int
 var db *sqlx.DB
 var signer *goalone.Sword
 
@@ -23,6 +25,8 @@ const (
 )
 
 func InitDB(path, secretKey string) {
+	difficulty = viper.GetInt("difficulty")
+
 	signer = goalone.New([]byte(secretKey))
 
 	db = sqlx.MustConnect("sqlite3", path)

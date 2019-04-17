@@ -34,8 +34,22 @@ func (u *User) IsAdmin() bool {
 	return u.Flags.Has(USER_FLAG_ADMIN)
 }
 
+func (u *User) UpdatePassword(password string) error {
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(
+		`UPDATE users SET password=? WHERE id=?`,
+		string(passwordHash),
+		u.Id,
+	)
+	return err
+}
+
 func CreateUser(username, password string, flags Bits) (*User, error) {
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), 8)
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
 	if err != nil {
 		return nil, err
 	}

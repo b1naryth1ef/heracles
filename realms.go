@@ -8,7 +8,7 @@ import (
 )
 
 type CreateRealmPayload struct {
-	Name string `json:"name"`
+	Name string `json:"name" schema:"name"`
 }
 
 func GetRealmsRoute(w http.ResponseWriter, r *http.Request) {
@@ -44,9 +44,9 @@ func PostRealmsRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateUserRealmGrantPayload struct {
-	RealmId int64   `json:"realm_id"`
-	UserId  int64   `json:"user_id"`
-	Alias   *string `json:"alias"`
+	RealmId int64   `json:"realm_id" schema:"realm_id"`
+	UserId  int64   `json:"user_id" schema:"user_id"`
+	Alias   *string `json:"alias" schema:"alias"`
 }
 
 func PostRealmsGrantsRoute(w http.ResponseWriter, r *http.Request) {

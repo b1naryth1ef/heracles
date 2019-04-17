@@ -155,19 +155,6 @@ func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Lookup redirect URL
-	redirectURLRaw := r.Form.Get("r")
-	if redirectURLRaw == "" {
-		gores.Error(w, http.StatusBadRequest, "Missing Redirect URL")
-		return
-	}
-
-	redirectURL, err := url.Parse(redirectURLRaw)
-	if err != nil {
-		gores.Error(w, http.StatusBadRequest, "Bad Redirect URL")
-		return
-	}
-
 	// Create our authentication cookie
 	authSecret := user.GetAuthSecret()
 	authSecretEncoded := base64.RawURLEncoding.EncodeToString(authSecret)
@@ -180,6 +167,18 @@ func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 		MaxAge: 60 * 60 * 24 * 14,
 	}
 	http.SetCookie(w, &cookie)
+
+	redirectURLRaw := r.Form.Get("r")
+	if redirectURLRaw == "" {
+		gores.NoContent(w)
+		return
+	}
+
+	redirectURL, err := url.Parse(redirectURLRaw)
+	if err != nil {
+		gores.Error(w, http.StatusBadRequest, "Bad Redirect URL")
+		return
+	}
 
 	http.Redirect(w, r, redirectURL.String(), http.StatusFound)
 }
@@ -195,13 +194,11 @@ func GetLogoutRoute(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, &cookie)
 
-	http.Redirect(w, r, "/", http.StatusFound)
-}
+	if r.Method == "GET" {
+		http.Redirect(w, r, "/", http.StatusFound)
+	}
 
-func GetIdentityRoute(w http.ResponseWriter, r *http.Request) {
-	user := getCurrentUser(r)
-
-	gores.JSON(w, http.StatusOK, user)
+	gores.NoContent(w)
 }
 
 func ValidateRoute(w http.ResponseWriter, r *http.Request) {
