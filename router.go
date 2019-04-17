@@ -100,6 +100,10 @@ func NewRouter() http.Handler {
 				r.Post("/grants", PostRealmsGrantsRoute)
 			})
 		})
+
+		adminRouter.Route("/log", func(r chi.Router) {
+			r.Get("/recent", GetRecentAuditLogRoute)
+		})
 	})
 
 	// router.With(RequireUserMiddleware).Route("/users/{user_id}", func(r chi.Router) {

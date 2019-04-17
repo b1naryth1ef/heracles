@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -33,11 +32,9 @@ func Run() {
 		}
 
 		log.Printf("Listening on %v", bind)
-		os.Stderr.WriteString("READY")
 		server.Serve(listener)
 	} else {
 		log.Printf("Listening on %v", bind)
-		os.Stderr.WriteString("READY")
 		log.Fatalln(http.ListenAndServe(bind, router))
 	}
 }

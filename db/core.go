@@ -28,6 +28,7 @@ func InitDB(path, secretKey string, bcryptDifficulty int) {
 	db.MustExec(USER_TOKEN_SCHEMA)
 	db.MustExec(REALM_SCHEMA)
 	db.MustExec(USER_REALM_GRANT_SCHEMA)
+	db.MustExec(AUDIT_LOG_ENTRY_SCHEMA)
 
 	var user User
 	err := db.Get(&user, `SELECT * FROM users LIMIT 1`)

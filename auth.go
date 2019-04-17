@@ -55,6 +55,12 @@ func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 	authSecret := user.GetAuthSecret()
 	authSecretEncoded := base64.RawURLEncoding.EncodeToString(authSecret)
 
+	_, err = db.CreateAuditLogEntry("user.self_login", user, nil)
+	if err != nil {
+		reportInternalError(w, err)
+		return
+	}
+
 	cookie := http.Cookie{
 		Name:   "heracles-auth",
 		Domain: viper.GetString("web.domain"),
