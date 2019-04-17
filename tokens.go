@@ -1,42 +1,12 @@
 package heracles
 
 import (
-	"context"
 	"database/sql"
 	"net/http"
-	"strconv"
 
 	"github.com/alioygur/gores"
 	"github.com/b1naryth1ef/heracles/db"
-	"github.com/go-chi/chi"
 )
-
-func getCurrentUserToken(r *http.Request) *db.UserToken {
-	return r.Context().Value("userToken").(*db.UserToken)
-}
-
-func RequireUserTokenMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenIdRaw := chi.URLParam(r, "tokenId")
-
-		tokenId, err := strconv.Atoi(tokenIdRaw)
-		if err != nil {
-			gores.Error(w, http.StatusBadRequest, "Invalid token ID")
-			return
-		}
-
-		userToken, err := db.GetUserTokenById(int64(tokenId))
-		if err == sql.ErrNoRows {
-			gores.Error(w, http.StatusNotFound, "Not Found")
-			return
-		} else if err != nil {
-			reportInternalError(w, err)
-			return
-		}
-
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), "userToken", userToken)))
-	})
-}
 
 func GetTokensRoute(w http.ResponseWriter, r *http.Request) {
 	user := getCurrentUser(r)
@@ -53,8 +23,9 @@ func GetTokensRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateTokenPayload struct {
-	Name   string `json:"name" schema:"name"`
-	UserId *int64 `json:"user_id" schema:"user_id"`
+	Name         string `json:"name" schema:"name"`
+	UserId       *int64 `json:"user_id" schema:"user_id"`
+	CanAccessAPI *bool  `json:"can_access_api" schema:"can_access_api"`
 }
 
 func PostTokensRoute(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +53,12 @@ func PostTokensRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	token, err := db.CreateUserToken(user.Id, payload.Name)
+	var flags db.Bits
+	if payload.CanAccessAPI == nil || *payload.CanAccessAPI {
+		flags = flags.Set(db.USER_TOKEN_FLAG_API)
+	}
+
+	token, err := db.CreateUserToken(user.Id, payload.Name, flags)
 	if err != nil {
 		reportInternalError(w, err)
 		return

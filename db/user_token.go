@@ -5,12 +5,18 @@ import (
 	"encoding/base64"
 )
 
+const (
+	// Whether the token can be used to access the heracles API
+	USER_TOKEN_FLAG_API = 1 << iota
+)
+
 const USER_TOKEN_SCHEMA = `
 CREATE TABLE IF NOT EXISTS user_tokens (
 	id INTEGER PRIMARY KEY,
 	user_id INTEGER,
 	name TEXT,
-	token TEXT
+	token TEXT,
+	flags INTEGER
 );
 `
 
@@ -19,6 +25,7 @@ type UserToken struct {
 	UserId int64  `json:"-" db:"user_id"`
 	Name   string `json:"name" db:"name"`
 	Token  string `json:"token" db:"token"`
+	Flags  Bits   `json:"flags" db:"flags"`
 }
 
 func (ut *UserToken) Delete() error {
@@ -28,9 +35,10 @@ func (ut *UserToken) Delete() error {
 
 func (ut *UserToken) Save() error {
 	_, err := db.Exec(
-		`UPDATE user_tokens SET name=? AND token=? WHERE id=?`,
+		`UPDATE user_tokens SET name=? AND token=? AND flags=? WHERE id=?`,
 		ut.Name,
 		ut.Token,
+		ut.Flags,
 		ut.Id,
 	)
 	return err
@@ -46,17 +54,18 @@ func GenerateUserTokenContents() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(tokenRaw), nil
 }
 
-func CreateUserToken(userId int64, name string) (*UserToken, error) {
+func CreateUserToken(userId int64, name string, flags Bits) (*UserToken, error) {
 	tokenEncoded, err := GenerateUserTokenContents()
 	if err != nil {
 		return nil, err
 	}
 
 	result, err := db.Exec(
-		`INSERT INTO user_tokens (user_id, name, token) VALUES (?, ?, ?);`,
+		`INSERT INTO user_tokens (user_id, name, token, flags) VALUES (?, ?, ?, ?);`,
 		userId,
 		name,
 		tokenEncoded,
+		flags,
 	)
 	if err != nil {
 		return nil, err
@@ -66,6 +75,7 @@ func CreateUserToken(userId int64, name string) (*UserToken, error) {
 		UserId: userId,
 		Name:   name,
 		Token:  tokenEncoded,
+		Flags:  flags,
 	}
 
 	userToken.Id, err = result.LastInsertId()

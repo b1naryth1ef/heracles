@@ -6,6 +6,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+const (
+	USER_FLAG_ADMIN = 1 << iota
+)
+
 const USER_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
 	id INTEGER PRIMARY KEY,
@@ -111,14 +115,24 @@ func GetUserById(id int64) (*User, error) {
 	return &user, nil
 }
 
-func GetUserByToken(token string) (*User, error) {
+func GetUserByToken(token string, isAPI bool) (*User, error) {
 	var user User
 
-	err := db.Get(&user, `
-		SELECT u.* FROM users u
-		JOIN user_tokens ut ON u.id = ut.user_id
-		WHERE ut.token = ?
-	`, token)
+	var err error
+	if isAPI {
+		err = db.Get(&user, `
+			SELECT u.* FROM users u
+			JOIN user_tokens ut ON u.id = ut.user_id
+			WHERE ut.token = ? AND ut.flags & ?
+		`, token, USER_TOKEN_FLAG_API)
+	} else {
+		err = db.Get(&user, `
+			SELECT u.* FROM users u
+			JOIN user_tokens ut ON u.id = ut.user_id
+			WHERE ut.token = ?
+		`, token)
+	}
+
 	if err != nil {
 		return nil, err
 	}

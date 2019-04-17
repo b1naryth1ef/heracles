@@ -61,13 +61,12 @@ func NewRouter() http.Handler {
 	router.Get("/login", GetLoginRoute)
 	router.Post("/login", PostLoginRoute)
 	router.Handle("/logout", http.HandlerFunc(GetLogoutRoute))
-
 	authRouter.Get("/", GetIndexRoute)
 
-	authRouter.Route("/api", func(apiRouter chi.Router) {
-		// Validate route used for linking up nginx auth_request
-		apiRouter.Handle("/validate", http.HandlerFunc(ValidateRoute))
+	// Validate route used for linking up nginx auth_request
+	router.Handle("/api/validate", http.HandlerFunc(ValidateRoute))
 
+	authRouter.Route("/api", func(apiRouter chi.Router) {
 		// Returns information about the current users identity
 		apiRouter.Get("/identity", GetIdentityRoute)
 

@@ -19,10 +19,6 @@ func (b Bits) Set(flag Bits) Bits   { return b | flag }
 func (b Bits) Clear(flag Bits) Bits { return b &^ flag }
 func (b Bits) Has(flag Bits) bool   { return b&flag != 0 }
 
-const (
-	USER_FLAG_ADMIN = 1 << iota
-)
-
 func InitDB(path, secretKey string, bcryptDifficulty int) {
 	difficulty = bcryptDifficulty
 	signer = goalone.New([]byte(secretKey))

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/b1naryth1ef/heracles"
@@ -15,11 +14,7 @@ func main() {
 
 	replacer := strings.NewReplacer(".", "_")
 	viper.SetEnvKeyReplacer(replacer)
-
-	err := viper.ReadInConfig()
-	if err != nil {
-		fmt.Printf("Failed to load config: %v\n", err)
-	}
+	viper.ReadInConfig()
 
 	heracles.Run()
 }

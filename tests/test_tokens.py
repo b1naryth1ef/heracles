@@ -7,30 +7,41 @@ def test_get_tokens(user_session):
     assert r.json()['tokens'] == [user_session.token]
 
 
-@pytest.mark.parametrize('admin', [True, False])
-def test_create_token(session, user_session, admin_session, random_string, admin):
+@pytest.mark.parametrize('admin,private', [(True, True), (False, True), (True, False), (False, False)])
+def test_create_token(session, user_session, admin_session, random_string, user_realm, admin, private):
     name = random_string(32)
 
-    if admin:
-        r = admin_session.post('/api/tokens', data={
-            'name': name,
-            'user_id': user_session.user_id,
-        })
-    else:
-        r = user_session.post('/api/tokens', data={
-            'name': name,
-        })
+    payload = {
+        'name': name,
+    }
 
+    if admin:
+        payload['user_id'] = user_session.user_id
+
+    if private:
+        payload['can_access_api'] = False
+
+    r = (admin_session if admin else user_session).post('/api/tokens', data=payload)
     assert r.status_code == 200
 
     data = r.json()
     assert data['name'] == name
+    assert data['flags'] == (0 if private else 1)
 
     r = session.get('/api/identity', headers={
         'Authorization': data['token'],
     })
-    assert r.status_code == 200
-    assert r.json()['username'] == user_session.username
+    if private:
+        assert r.status_code == 401
+    else:
+        assert r.status_code == 200
+        assert r.json()['username'] == user_session.username
+
+    r = session.get('/api/validate', headers={
+        'Authorization': data['token'],
+        'X-Heracles-Realm': user_realm['name'],
+    })
+    assert r.status_code == 204
 
     r = user_session.get('/api/tokens')
     assert r.status_code == 200
