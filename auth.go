@@ -161,7 +161,7 @@ func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 
 	cookie := http.Cookie{
 		Name:   "heracles-auth",
-		Domain: viper.GetString("cookie_domain"),
+		Domain: viper.GetString("web.domain"),
 		Value:  authSecretEncoded,
 		Path:   "",
 		MaxAge: 60 * 60 * 24 * 14,
@@ -186,7 +186,7 @@ func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 func GetLogoutRoute(w http.ResponseWriter, r *http.Request) {
 	cookie := http.Cookie{
 		Name:   "heracles-auth",
-		Domain: viper.GetString("cookie_domain"),
+		Domain: viper.GetString("web.domain"),
 		Value:  "",
 		Path:   "",
 		MaxAge: -1,

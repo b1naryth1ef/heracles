@@ -1,11 +1,42 @@
 package heracles
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/alioygur/gores"
 	"github.com/b1naryth1ef/heracles/db"
+	"github.com/go-chi/chi"
 )
+
+func getCurrentRealm(r *http.Request) *db.Realm {
+	return r.Context().Value("realm").(*db.Realm)
+}
+
+func RequireRealmMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		realmIdRaw := chi.URLParam(r, "realmId")
+
+		realmId, err := strconv.Atoi(realmIdRaw)
+		if err != nil {
+			gores.Error(w, http.StatusBadRequest, "Invalid realm ID")
+			return
+		}
+
+		realm, err := db.GetRealmById(int64(realmId))
+		if err == sql.ErrNoRows {
+			gores.Error(w, http.StatusNotFound, "Not Found")
+			return
+		} else if err != nil {
+			reportInternalError(w, err)
+			return
+		}
+
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), "realm", realm)))
+	})
+}
 
 type CreateRealmPayload struct {
 	Name string `json:"name" schema:"name"`
@@ -44,9 +75,8 @@ func PostRealmsRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateUserRealmGrantPayload struct {
-	RealmId int64   `json:"realm_id" schema:"realm_id"`
-	UserId  int64   `json:"user_id" schema:"user_id"`
-	Alias   *string `json:"alias" schema:"alias"`
+	UserId int64   `json:"user_id" schema:"user_id"`
+	Alias  *string `json:"alias" schema:"alias"`
 }
 
 func PostRealmsGrantsRoute(w http.ResponseWriter, r *http.Request) {
@@ -55,11 +85,7 @@ func PostRealmsGrantsRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	realm, err := db.GetRealmById(payload.RealmId)
-	if err != nil {
-		reportInternalError(w, err)
-		return
-	}
+	realm := getCurrentRealm(r)
 
 	user, err := db.GetUserById(payload.UserId)
 	if err != nil {

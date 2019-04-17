@@ -1,15 +1,8 @@
-- Add ability to change password
-- Add the concept of realms
-  - users can be a member of realms
-  - when valdiating check if the user can see the realm
-- Add the concept of tokens
-  - users can create tokens on behalf of themselves
-  - tokens can be authed via basic auth or `Authentication: {...}` header
-  - tokens can be limited to a subset of realms (maybe?)
 - Add audit log
 - Add HTML UI
   - make it pretty :)
 - Add CLI tool
-- Support JSON/PostForm for data
 - AD/LDAP Provider?
-- MFA (2FA, Fido)
+- MFA
+  - TOTP
+  - U2F

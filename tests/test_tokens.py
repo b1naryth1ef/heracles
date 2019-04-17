@@ -4,7 +4,7 @@ import pytest
 def test_get_tokens(user_session):
     r = user_session.get('/api/tokens')
     assert r.status_code == 200
-    assert r.json()['tokens'] is None
+    assert r.json()['tokens'] == [user_session.token]
 
 
 @pytest.mark.parametrize('admin', [True, False])
@@ -34,7 +34,7 @@ def test_create_token(session, user_session, admin_session, random_string, admin
 
     r = user_session.get('/api/tokens')
     assert r.status_code == 200
-    assert len(r.json()['tokens']) == 1
+    assert len(r.json()['tokens']) == 2
 
 
 @pytest.mark.parametrize('admin', [True, False])
@@ -52,11 +52,11 @@ def test_patch_token(admin, user_token, user_session, admin_session, random_stri
 def test_delete_token(admin, user_token, user_session, admin_session):
     r = user_session.get('/api/tokens')
     assert r.status_code == 200
-    assert r.json()['tokens'] == [user_token]
+    assert user_token in r.json()['tokens']
 
     r = (admin_session if admin else user_session).delete(f"/api/tokens/{user_token['id']}")
     assert r.status_code == 204
 
     r = user_session.get('/api/tokens')
     assert r.status_code == 200
-    assert r.json()['tokens'] is None
+    assert r.json()['tokens'] == [user_session.token]

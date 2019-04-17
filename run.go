@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -15,11 +16,11 @@ import (
 func Run() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	db.InitDB(viper.GetString("db_path"), viper.GetString("secret_key"))
+	db.InitDB(viper.GetString("db.path"), viper.GetString("security.secret"), viper.GetInt("security.bcrypt.difficulty"))
 
 	router := NewRouter()
 
-	bind := viper.GetString("bind")
+	bind := viper.GetString("web.bind")
 	if strings.HasPrefix(bind, "unix://") {
 		listener, err := net.Listen("unix", strings.TrimPrefix(bind, "unix://"))
 		if err != nil {
@@ -32,9 +33,11 @@ func Run() {
 		}
 
 		log.Printf("Listening on %v", bind)
+		os.Stderr.WriteString("READY")
 		server.Serve(listener)
 	} else {
 		log.Printf("Listening on %v", bind)
+		os.Stderr.WriteString("READY")
 		log.Fatalln(http.ListenAndServe(bind, router))
 	}
 }

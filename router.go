@@ -96,7 +96,10 @@ func NewRouter() http.Handler {
 		adminRouter.Route("/realms", func(r chi.Router) {
 			r.Get("/", GetRealmsRoute)
 			r.Post("/", PostRealmsRoute)
-			r.Post("/grants", PostRealmsGrantsRoute)
+
+			r.With(RequireRealmMiddleware).Route("/{realmId}", func(r chi.Router) {
+				r.Post("/grants", PostRealmsGrantsRoute)
+			})
 		})
 	})
 

@@ -20,8 +20,8 @@ func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if payload.Username == "" || payload.Password == "" {
-		gores.Error(w, http.StatusBadRequest, "username and password are required")
+	if payload.Username == "" {
+		gores.Error(w, http.StatusBadRequest, "username is required")
 		return
 	}
 

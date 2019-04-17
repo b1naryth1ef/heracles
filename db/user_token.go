@@ -88,5 +88,8 @@ func GetUserTokenById(id int64) (*UserToken, error) {
 func GetUserTokensByUserId(id int64) ([]UserToken, error) {
 	var userTokens []UserToken
 	err := db.Select(&userTokens, `SELECT * FROM user_tokens WHERE user_id=?`, id)
+	if userTokens == nil {
+		return make([]UserToken, 0), err
+	}
 	return userTokens, err
 }

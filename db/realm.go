@@ -42,5 +42,8 @@ func GetRealmById(id int64) (*Realm, error) {
 func GetRealms() ([]Realm, error) {
 	var realms []Realm
 	err := db.Select(&realms, `SELECT * FROM realms`)
+	if realms == nil {
+		return make([]Realm, 0), err
+	}
 	return realms, err
 }

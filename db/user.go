@@ -35,29 +35,38 @@ func (u *User) IsAdmin() bool {
 }
 
 func (u *User) UpdatePassword(password string) error {
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
-	if err != nil {
-		return err
+	var passwordHash string
+
+	if password != "" {
+		passwordHashRaw, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
+		if err != nil {
+			return err
+		}
+		passwordHash = string(passwordHashRaw)
 	}
 
-	_, err = db.Exec(
+	_, err := db.Exec(
 		`UPDATE users SET password=? WHERE id=?`,
-		string(passwordHash),
+		passwordHash,
 		u.Id,
 	)
 	return err
 }
 
 func CreateUser(username, password string, flags Bits) (*User, error) {
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
-	if err != nil {
-		return nil, err
+	var passwordHash string
+	if password != "" {
+		passwordHashRaw, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
+		if err != nil {
+			return nil, err
+		}
+		passwordHash = string(passwordHashRaw)
 	}
 
 	result, err := db.Exec(
 		`INSERT INTO users (username, password, flags) VALUES (?, ?, ?);`,
 		username,
-		string(passwordHash),
+		passwordHash,
 		flags,
 	)
 	if err != nil {
@@ -131,5 +140,8 @@ func GetUserByUsername(username string) (*User, error) {
 func GetUsers() ([]User, error) {
 	var users []User
 	err := db.Select(&users, `SELECT * FROM users`)
+	if users == nil {
+		return make([]User, 0), err
+	}
 	return users, err
 }
