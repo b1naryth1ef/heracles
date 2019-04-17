@@ -7,7 +7,7 @@ import random
 import string
 
 
-def random_string(size):
+def get_random_string(size):
     return ''.join([random.choice(string.ascii_letters) for _ in range(size)])
 
 
@@ -19,6 +19,11 @@ class SessionWithUrlBase(requests_unixsocket.Session):
     def request(self, method, url, **kwargs):
         modified_url = self.url_base + url
         return super(SessionWithUrlBase, self).request(method, modified_url, **kwargs)
+
+
+@pytest.fixture(scope='session')
+def random_string():
+    return get_random_string
 
 
 @pytest.fixture(scope='session')
@@ -59,8 +64,8 @@ def admin_session(heracles):
 
 @pytest.fixture(scope='function')
 def user_session(admin_session, session):
-    username = random_string(32)
-    password = random_string(32)
+    username = get_random_string(32)
+    password = get_random_string(32)
 
     resp = admin_session.post('/api/users', data={
         'username': username,
@@ -84,7 +89,7 @@ def user_session(admin_session, session):
 
 @pytest.fixture(scope='function')
 def user_realm(user_session, admin_session):
-    realm_name = random_string(32)
+    realm_name = get_random_string(32)
 
     resp = admin_session.post('/api/realms', data={
         'name': realm_name,
@@ -98,3 +103,12 @@ def user_realm(user_session, admin_session):
     })
     assert resp.status_code == 200
     return realm
+
+
+@pytest.fixture(scope='function')
+def user_token(user_session):
+    r = user_session.post('/api/tokens', data={
+        'name': get_random_string(32),
+    })
+    assert r.status_code == 200
+    return r.json()

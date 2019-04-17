@@ -53,8 +53,8 @@ func GetTokensRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 type CreateTokenPayload struct {
-	Name   string `json:"name"`
-	UserId *int64 `json:"user_id"`
+	Name   string `json:"name" schema:"name"`
+	UserId *int64 `json:"user_id" schema:"user_id"`
 }
 
 func PostTokensRoute(w http.ResponseWriter, r *http.Request) {
