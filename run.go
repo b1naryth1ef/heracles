@@ -10,12 +10,27 @@ import (
 
 	"github.com/b1naryth1ef/heracles/db"
 	"github.com/spf13/viper"
+	"layeh.com/radius"
 )
 
 func Run() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	db.InitDB(viper.GetString("db.path"), viper.GetString("security.secret"), viper.GetInt("security.bcrypt.difficulty"))
+
+	if viper.GetBool("radius.enabled") {
+		server := radius.PacketServer{
+			Handler:      radius.HandlerFunc(handleRadiusRequest),
+			SecretSource: radius.StaticSecretSource([]byte(viper.GetString("radius.secret"))),
+		}
+
+		go func() {
+			log.Printf("RADIUS listening on :1812")
+			if err := server.ListenAndServe(); err != nil {
+				log.Fatal(err)
+			}
+		}()
+	}
 
 	router := NewRouter()
 
