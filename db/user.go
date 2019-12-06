@@ -15,15 +15,17 @@ CREATE TABLE IF NOT EXISTS users (
 	id INTEGER PRIMARY KEY,
 	username TEXT,
 	password TEXT,
-	flags INTEGER
+	flags INTEGER,
+	discord_id INTEGER
 );
 `
 
 type User struct {
-	Id       int64  `json:"id" db:"id"`
-	Username string `json:"username" db:"username"`
-	Password string `json:"-" db:"password"`
-	Flags    Bits   `json:"-" db:"flags"`
+	Id        int64  `json:"id" db:"id"`
+	Username  string `json:"username" db:"username"`
+	Password  string `json:"-" db:"password"`
+	Flags     Bits   `json:"-" db:"flags"`
+	DiscordId *int64 `json:"discord_id" db:"discord_id"`
 }
 
 func (u *User) CheckPassword(password string) error {
@@ -57,7 +59,7 @@ func (u *User) UpdatePassword(password string) error {
 	return err
 }
 
-func CreateUser(username, password string, flags Bits) (*User, error) {
+func CreateUser(username, password string, flags Bits, discordId *int64) (*User, error) {
 	var passwordHash string
 	if password != "" {
 		passwordHashRaw, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
@@ -68,10 +70,11 @@ func CreateUser(username, password string, flags Bits) (*User, error) {
 	}
 
 	result, err := db.Exec(
-		`INSERT INTO users (username, password, flags) VALUES (?, ?, ?);`,
+		`INSERT INTO users (username, password, flags, discord_id) VALUES (?, ?, ?, ?);`,
 		username,
 		passwordHash,
 		flags,
+		discordId,
 	)
 	if err != nil {
 		return nil, err
@@ -83,10 +86,11 @@ func CreateUser(username, password string, flags Bits) (*User, error) {
 	}
 
 	return &User{
-		Id:       id,
-		Username: username,
-		Password: password,
-		Flags:    flags,
+		Id:        id,
+		Username:  username,
+		Password:  password,
+		Flags:     flags,
+		DiscordId: discordId,
 	}, nil
 }
 
@@ -108,6 +112,17 @@ func GetUserById(id int64) (*User, error) {
 	var user User
 
 	err := db.Get(&user, `SELECT * FROM users WHERE id=?`, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func GetUserByDiscordId(id int64) (*User, error) {
+	var user User
+
+	err := db.Get(&user, `SELECT * FROM users WHERE discord_id=?`, id)
 	if err != nil {
 		return nil, err
 	}

@@ -43,7 +43,7 @@ func bootstrapDB() {
 	var flags Bits
 	flags = flags.Set(USER_FLAG_ADMIN)
 
-	_, err := CreateUser("admin", "admin", flags)
+	_, err := CreateUser("admin", "admin", flags, nil)
 	if err != nil {
 		panic(err)
 	}

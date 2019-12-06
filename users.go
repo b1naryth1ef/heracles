@@ -8,9 +8,10 @@ import (
 )
 
 type CreateUserPayload struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Admin    bool   `json:"admin"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	Admin     bool   `json:"admin"`
+	DiscordId *int64 `json:"discord_id"`
 }
 
 func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +31,7 @@ func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
 		flags = flags.Set(db.USER_FLAG_ADMIN)
 	}
 
-	user, err := db.CreateUser(payload.Username, payload.Password, flags)
+	user, err := db.CreateUser(payload.Username, payload.Password, flags, payload.DiscordId)
 	if err != nil {
 		reportInternalError(w, err)
 		return

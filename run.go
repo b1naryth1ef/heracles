@@ -9,14 +9,33 @@ import (
 	"time"
 
 	"github.com/b1naryth1ef/heracles/db"
+	"github.com/gorilla/sessions"
 	"github.com/spf13/viper"
 	"layeh.com/radius"
 )
 
+var (
+	sessionStore *sessions.CookieStore
+)
+
+func getSession(w http.ResponseWriter, r *http.Request) *sessions.Session {
+	session, err := sessionStore.Get(r, "session")
+	if err != nil {
+		http.Error(w, "Invalid or corrupted session", http.StatusInternalServerError)
+	}
+	return session
+}
+
 func Run() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
+	sessionStore = sessions.NewCookieStore([]byte(viper.GetString("security.secret")))
+
 	db.InitDB(viper.GetString("db.path"), viper.GetString("security.secret"), viper.GetInt("security.bcrypt.difficulty"))
+
+	if viper.GetBool("discord.enabled") {
+		InitializeDiscordAuth()
+	}
 
 	if viper.GetBool("radius.enabled") {
 		server := radius.PacketServer{

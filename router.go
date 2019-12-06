@@ -60,6 +60,8 @@ func NewRouter() http.Handler {
 	// Static/User-Friendly Routes
 	router.Get("/login", GetLoginRoute)
 	router.Post("/login", PostLoginRoute)
+	router.Get("/login/discord", GetLoginDiscordRoute)
+	router.Get("/login/discord/callback", GetLoginDiscordCallbackRoute)
 	router.Handle("/logout", http.HandlerFunc(GetLogoutRoute))
 	authRouter.Get("/", GetIndexRoute)
 
