@@ -12,6 +12,8 @@ func main() {
 	viper.AddConfigPath(".")
 	viper.AutomaticEnv()
 
+	viper.SetDefault("log_requests", true)
+
 	replacer := strings.NewReplacer(".", "_")
 	viper.SetEnvKeyReplacer(replacer)
 	viper.ReadInConfig()

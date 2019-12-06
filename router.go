@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/gorilla/schema"
+	"github.com/spf13/viper"
 )
 
 const timeout = 15 * time.Second
@@ -53,7 +54,10 @@ func NewRouter() http.Handler {
 	router := chi.NewRouter()
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.Timeout(timeout))
-	router.Use(middleware.Logger)
+
+	if viper.GetBool("log_requests") {
+		router.Use(middleware.Logger)
+	}
 
 	authRouter := router.With(RequireAuthMiddleware)
 
