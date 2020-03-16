@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -104,23 +105,42 @@ func GetLogoutRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func ValidateRoute(w http.ResponseWriter, r *http.Request) {
+	quiet := false
+
+	quietArgs, ok := r.URL.Query()["quiet"]
+	if ok && len(quietArgs) == 1 && quietArgs[0] == "1" {
+		quiet = true
+	}
+
 	user, err := findRequestUser(r, false)
 	if err != nil {
-		gores.Error(w, http.StatusUnauthorized, "Unauthorized")
+		if quiet {
+			gores.NoContent(w)
+		} else {
+			gores.Error(w, http.StatusUnauthorized, "Unauthorized")
+		}
 		return
 	}
 
 	realm := r.Header.Get("X-Heracles-Realm")
 	if realm == "" {
-		log.Printf("[Validate] invalid realm provided: %v", realm)
-		gores.Error(w, http.StatusBadRequest, "Invalid Realm")
+		if quiet {
+			gores.NoContent(w)
+		} else {
+			log.Printf("[Validate] invalid realm provided: %v", realm)
+			gores.Error(w, http.StatusBadRequest, "Invalid Realm")
+		}
 		return
 	}
 
 	realmGrant, err := db.GetUserRealmGrantByRealmName(user.Id, realm)
 	if err != nil {
-		log.Printf("[Validate] failed to find realm grant for user %v and realm %v: %v", user.Username, realm, err)
-		gores.Error(w, http.StatusUnauthorized, "Unauthorized")
+		if quiet {
+			gores.NoContent(w)
+		} else {
+			log.Printf("[Validate] failed to find realm grant for user %v and realm %v: %v", user.Username, realm, err)
+			gores.Error(w, http.StatusUnauthorized, "Unauthorized")
+		}
 		return
 	}
 
@@ -128,6 +148,10 @@ func ValidateRoute(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Heracles-User", *realmGrant.Alias)
 	} else {
 		w.Header().Set("X-Heracles-User", user.Username)
+	}
+
+	if user.DiscordId != nil {
+		w.Header().Set("X-Heracles-DiscordID", fmt.Sprintf("%v", *user.DiscordId))
 	}
 
 	gores.NoContent(w)
