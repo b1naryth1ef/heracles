@@ -122,6 +122,10 @@ func ValidateRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if user.DiscordId != nil {
+		w.Header().Set("X-Heracles-DiscordID", fmt.Sprintf("%v", *user.DiscordId))
+	}
+
 	realm := r.Header.Get("X-Heracles-Realm")
 	if realm == "" {
 		if quiet {
@@ -148,10 +152,6 @@ func ValidateRoute(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Heracles-User", *realmGrant.Alias)
 	} else {
 		w.Header().Set("X-Heracles-User", user.Username)
-	}
-
-	if user.DiscordId != nil {
-		w.Header().Set("X-Heracles-DiscordID", fmt.Sprintf("%v", *user.DiscordId))
 	}
 
 	gores.NoContent(w)

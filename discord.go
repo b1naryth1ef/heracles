@@ -1,6 +1,7 @@
 package heracles
 
 import (
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -129,8 +130,21 @@ func GetLoginDiscordCallbackRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := db.GetUserByDiscordId(id)
-	if err != nil {
+	var user *db.User
+
+	user, err = db.GetUserByDiscordId(id)
+	if err == sql.ErrNoRows {
+		if viper.GetBool("discord.create") {
+			user, err = db.CreateUser(discordUser.Username, "", 0, &id)
+			if err != nil {
+				reportInternalError(w, err)
+				return
+			}
+		} else {
+			reportInternalError(w, err)
+			return
+		}
+	} else if err != nil {
 		reportInternalError(w, err)
 		return
 	}
