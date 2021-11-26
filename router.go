@@ -66,6 +66,8 @@ func NewRouter() http.Handler {
 	router.Post("/login", PostLoginRoute)
 	router.Get("/login/discord", GetLoginDiscordRoute)
 	router.Get("/login/discord/callback", GetLoginDiscordCallbackRoute)
+	router.Get("/login/github", GetLoginGithubRoute)
+	router.Get("/login/github/callback", GetLoginGithubCallbackRoute)
 	router.Handle("/logout", http.HandlerFunc(GetLogoutRoute))
 	authRouter.Get("/", GetIndexRoute)
 
@@ -111,12 +113,6 @@ func NewRouter() http.Handler {
 			r.Get("/recent", GetRecentAuditLogRoute)
 		})
 	})
-
-	// router.With(RequireUserMiddleware).Route("/users/{user_id}", func(r chi.Router) {
-	// 	r.Get("/", GetUser)
-	// 	r.Patch("/", PatchUser)
-	// 	r.Delete("/", DeleteUser)
-	// })
 
 	return router
 }

@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/bwmarrin/go-alone"
+	goalone "github.com/bwmarrin/go-alone"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -43,7 +43,7 @@ func bootstrapDB() {
 	var flags Bits
 	flags = flags.Set(USER_FLAG_ADMIN)
 
-	_, err := CreateUser("admin", "admin", flags, nil)
+	_, err := CreateUser("admin", "admin", flags, nil, nil)
 	if err != nil {
 		panic(err)
 	}

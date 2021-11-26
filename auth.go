@@ -62,9 +62,14 @@ func PostLoginRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	heraclesRealmDomain := r.Header.Get("X-Heracles-Realm-Domain")
+	if heraclesRealmDomain == "" {
+		heraclesRealmDomain = viper.GetString("web.domain")
+	}
+
 	cookie := http.Cookie{
 		Name:   "heracles-auth",
-		Domain: viper.GetString("web.domain"),
+		Domain: heraclesRealmDomain,
 		Value:  authSecretEncoded,
 		Path:   "",
 		MaxAge: 60 * 60 * 24 * 14,
@@ -114,6 +119,7 @@ func ValidateRoute(w http.ResponseWriter, r *http.Request) {
 
 	user, err := findRequestUser(r, false)
 	if err != nil {
+		log.Printf("Could not find request user")
 		if quiet {
 			gores.NoContent(w)
 		} else {
@@ -124,6 +130,10 @@ func ValidateRoute(w http.ResponseWriter, r *http.Request) {
 
 	if user.DiscordId != nil {
 		w.Header().Set("X-Heracles-DiscordID", fmt.Sprintf("%v", *user.DiscordId))
+	}
+
+	if user.GithubId != nil {
+		w.Header().Set("X-Heracles-GithubID", fmt.Sprintf("%v", *user.GithubId))
 	}
 
 	realm := r.Header.Get("X-Heracles-Realm")

@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
 	username TEXT,
 	password TEXT,
 	flags INTEGER,
-	discord_id INTEGER
+	discord_id INTEGER,
+	github_id INTEGER
 );
 `
 
@@ -26,6 +27,7 @@ type User struct {
 	Password  string `json:"-" db:"password"`
 	Flags     Bits   `json:"-" db:"flags"`
 	DiscordId *int64 `json:"discord_id" db:"discord_id"`
+	GithubId  *int64 `json:"github_id" db:"github_id"`
 }
 
 func (u *User) CheckPassword(password string) error {
@@ -59,7 +61,7 @@ func (u *User) UpdatePassword(password string) error {
 	return err
 }
 
-func CreateUser(username, password string, flags Bits, discordId *int64) (*User, error) {
+func CreateUser(username, password string, flags Bits, discordId *int64, githubId *int64) (*User, error) {
 	var passwordHash string
 	if password != "" {
 		passwordHashRaw, err := bcrypt.GenerateFromPassword([]byte(password), difficulty)
@@ -91,6 +93,7 @@ func CreateUser(username, password string, flags Bits, discordId *int64) (*User,
 		Password:  password,
 		Flags:     flags,
 		DiscordId: discordId,
+		GithubId:  githubId,
 	}, nil
 }
 
@@ -123,6 +126,17 @@ func GetUserByDiscordId(id int64) (*User, error) {
 	var user User
 
 	err := db.Get(&user, `SELECT * FROM users WHERE discord_id=?`, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func GetUserByGithubId(id int64) (*User, error) {
+	var user User
+
+	err := db.Get(&user, `SELECT * FROM users WHERE github_id=?`, id)
 	if err != nil {
 		return nil, err
 	}

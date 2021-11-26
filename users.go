@@ -12,6 +12,7 @@ type CreateUserPayload struct {
 	Password  string `json:"password"`
 	Admin     bool   `json:"admin"`
 	DiscordId *int64 `json:"discord_id"`
+	GithubId  *int64 `json:"github_id"`
 }
 
 func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +32,7 @@ func PostUsersRoute(w http.ResponseWriter, r *http.Request) {
 		flags = flags.Set(db.USER_FLAG_ADMIN)
 	}
 
-	user, err := db.CreateUser(payload.Username, payload.Password, flags, payload.DiscordId)
+	user, err := db.CreateUser(payload.Username, payload.Password, flags, payload.DiscordId, payload.GithubId)
 	if err != nil {
 		reportInternalError(w, err)
 		return

@@ -3,7 +3,8 @@ package db
 const REALM_SCHEMA = `
 CREATE TABLE IF NOT EXISTS realms (
 	id INTEGER PRIMARY KEY,
-	name TEXT
+	name TEXT,
+	domain TEXT
 );
 `
 

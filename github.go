@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/alioygur/gores"
@@ -18,38 +17,33 @@ import (
 )
 
 const (
-	authURL      string = "https://discordapp.com/api/oauth2/authorize"
-	tokenURL     string = "https://discordapp.com/api/oauth2/token"
-	userEndpoint string = "https://discordapp.com/api/v7/users/@me"
+	githubAuthURL      string = "https://github.com/login/oauth/authorize"
+	githubTokenURL     string = "https://github.com/login/oauth/access_token"
+	githubUserEndpoint string = "https://api.github.com/user"
 )
 
-type DiscordUser struct {
-	ID            string `json:"id"`
-	Username      string `json:"username"`
-	Discriminator string `json:"discriminator"`
-	Avatar        string `json:"string"`
-	Email         string `json:"email"`
-	Verified      bool   `json:"verified"`
+var githubCachedConfig *oauth2.Config
+
+type GithubUser struct {
+	ID               int64  `json:"id"`
+	Login            string `json:"login"`
+	OrganizationsURL string `json:"organizations_url"`
 }
 
-func GetDiscordConfig(redirectURI string) *oauth2.Config {
-	return &oauth2.Config{
-		ClientID:     viper.GetString("discord.client_id"),
-		ClientSecret: viper.GetString("discord.client_secret"),
-		RedirectURL:  redirectURI,
+func InitializeGithubAuth() {
+	githubCachedConfig = &oauth2.Config{
+		ClientID:     viper.GetString("github.client_id"),
+		ClientSecret: viper.GetString("github.client_secret"),
+		RedirectURL:  viper.GetString("github.redirect_uri"),
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  authURL,
-			TokenURL: tokenURL,
+			AuthURL:  githubAuthURL,
+			TokenURL: githubTokenURL,
 		},
-		Scopes: []string{"identify"},
+		Scopes: []string{"user", "read:org"},
 	}
 }
 
-func GetLoginDiscordRoute(w http.ResponseWriter, r *http.Request) {
-	if !viper.GetBool("discord.enabled") {
-		gores.Error(w, http.StatusNotFound, "not found")
-	}
-
+func GetLoginGithubRoute(w http.ResponseWriter, r *http.Request) {
 	session := getSession(w, r)
 	if session == nil {
 		return
@@ -77,12 +71,11 @@ func GetLoginDiscordRoute(w http.ResponseWriter, r *http.Request) {
 	session.Values["state"] = randSeq(32)
 	session.Save(r, w)
 
-	authConfig := GetDiscordConfig(fmt.Sprintf("https://%v/login/discord/callback", r.Host))
-	url := authConfig.AuthCodeURL(session.Values["state"].(string), oauth2.AccessTypeOnline)
+	url := githubCachedConfig.AuthCodeURL(session.Values["state"].(string), oauth2.AccessTypeOnline)
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
-func GetLoginDiscordCallbackRoute(w http.ResponseWriter, r *http.Request) {
+func GetLoginGithubCallbackRoute(w http.ResponseWriter, r *http.Request) {
 	session := getSession(w, r)
 	if session == nil {
 		return
@@ -100,20 +93,19 @@ func GetLoginDiscordCallbackRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authConfig := GetDiscordConfig(fmt.Sprintf("https://%v/login/discord/callback", r.Host))
-	token, err := authConfig.Exchange(context.Background(), r.FormValue("code"))
+	token, err := githubCachedConfig.Exchange(context.Background(), r.FormValue("code"))
 	if err != nil {
 		reportInternalError(w, err)
 		return
 	}
 
-	req, err := http.NewRequest("GET", userEndpoint, nil)
+	req, err := http.NewRequest("GET", githubUserEndpoint, nil)
 	if err != nil {
 		reportInternalError(w, err)
 		return
 	}
 
-	req.Header.Set("Authorization", token.Type()+" "+token.AccessToken)
+	req.Header.Set("Authorization", "token "+token.AccessToken)
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	res, err := client.Do(req)
@@ -122,14 +114,8 @@ func GetLoginDiscordCallbackRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var discordUser DiscordUser
-	err = json.NewDecoder(res.Body).Decode(&discordUser)
-	if err != nil {
-		reportInternalError(w, err)
-		return
-	}
-
-	id, err := strconv.ParseInt(discordUser.ID, 10, 64)
+	var githubUser GithubUser
+	err = json.NewDecoder(res.Body).Decode(&githubUser)
 	if err != nil {
 		reportInternalError(w, err)
 		return
@@ -137,10 +123,10 @@ func GetLoginDiscordCallbackRoute(w http.ResponseWriter, r *http.Request) {
 
 	var user *db.User
 
-	user, err = db.GetUserByDiscordId(id)
+	user, err = db.GetUserByGithubId(githubUser.ID)
 	if err == sql.ErrNoRows {
-		if viper.GetBool("discord.create") {
-			user, err = db.CreateUser(discordUser.Username, "", 0, &id, nil)
+		if viper.GetBool("github.create") {
+			user, err = db.CreateUser(githubUser.Login, "", 0, nil, &githubUser.ID)
 			if err != nil {
 				reportInternalError(w, err)
 				return
@@ -158,7 +144,7 @@ func GetLoginDiscordCallbackRoute(w http.ResponseWriter, r *http.Request) {
 	authSecretEncoded := base64.RawURLEncoding.EncodeToString(authSecret)
 
 	_, err = db.CreateAuditLogEntry("user.self_login", user, map[string]interface{}{
-		"discord": id,
+		"github": githubUser.ID,
 	})
 	if err != nil {
 		reportInternalError(w, err)
@@ -167,7 +153,7 @@ func GetLoginDiscordCallbackRoute(w http.ResponseWriter, r *http.Request) {
 
 	cookie := http.Cookie{
 		Name:   "heracles-auth",
-		Domain: "." + r.Host,
+		Domain: "buildyboi.ci",
 		Value:  authSecretEncoded,
 		Path:   "/",
 		MaxAge: 60 * 60 * 24 * 14,

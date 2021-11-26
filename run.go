@@ -33,8 +33,8 @@ func Run() {
 
 	db.InitDB(viper.GetString("db.path"), viper.GetString("security.secret"), viper.GetInt("security.bcrypt.difficulty"))
 
-	if viper.GetBool("discord.enabled") {
-		InitializeDiscordAuth()
+	if viper.GetBool("github.enabled") {
+		InitializeGithubAuth()
 	}
 
 	if viper.GetBool("radius.enabled") {

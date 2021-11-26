@@ -13,19 +13,30 @@
   </head>
   <body>
     <main>
-    <form action="/login" method="post">
-      <label for="username"><b>Username</b></label>
-      <input type="text" placeholder="Enter Username" name="username" required>
+      <form action="/login" method="post">
+        <label for="username"><b>Username</b></label>
+        <input
+          type="text"
+          placeholder="Enter Username"
+          name="username"
+          required
+        />
 
-      <label for="password"><b>Password</b></label>
-      <input type="password" placeholder="Enter Password" name="password" required>
+        <label for="password"><b>Password</b></label>
+        <input
+          type="password"
+          placeholder="Enter Password"
+          name="password"
+          required
+        />
 
-      <input type="hidden" name="r" value="{{.}}">
+        <input type="hidden" name="r" value="{{.}}" />
 
-      <button type="submit">Login</button>
-    </form>
+        <button type="submit">Login</button>
+      </form>
 
-    <a href="/login/discord?r={{.}}">Login with Discord</a>
+      <a href="/login/discord?r={{.}}">Login with Discord</a>
+      <a href="/login/github?r={{.}}">Login with Github</a>
     </main>
   </body>
 </html>
